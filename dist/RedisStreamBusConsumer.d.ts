@@ -1,0 +1,36 @@
+import { BookTopNStreamEvent, CandleStreamEvent, StreamBusEvent, TradeStreamEvent } from "./types";
+export type StreamType = "candle" | "book" | "trade";
+export type StreamBusMessage = {
+    id: string;
+    fields: Record<string, string>;
+};
+export type StreamBusReadResult = {
+    key: string;
+    messages: StreamBusMessage[];
+};
+export type StreamBusConsumerConfig = {
+    redisUrl: string;
+    streamBase?: string;
+    groupName: string;
+    consumerName: string;
+};
+export declare class RedisStreamBusConsumer {
+    private client;
+    private streamBase;
+    private groupName;
+    private consumerName;
+    constructor(config: StreamBusConsumerConfig);
+    connect(): Promise<void>;
+    close(): Promise<void>;
+    ensureGroup(type: StreamType, startId?: string): Promise<void>;
+    readPending(type: StreamType, count?: number): Promise<StreamBusReadResult[]>;
+    readNew(type: StreamType, count?: number, blockMs?: number): Promise<StreamBusReadResult[]>;
+    ack(type: StreamType, ids: string | string[]): Promise<number>;
+    private streamKey;
+    private normalizeReadReply;
+    private toStringFields;
+}
+export declare const decodeCandle: (fields: Record<string, string>) => CandleStreamEvent | null;
+export declare const decodeBookTopN: (fields: Record<string, string>) => BookTopNStreamEvent | null;
+export declare const decodeTrade: (fields: Record<string, string>) => TradeStreamEvent | null;
+export declare const decodeStreamEvent: (fields: Record<string, string>) => StreamBusEvent | null;
