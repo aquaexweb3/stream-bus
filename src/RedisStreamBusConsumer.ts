@@ -18,6 +18,8 @@ export type StreamBusReadResult = {
   messages: StreamBusMessage[];
 };
 
+export type StreamBusMessageHandler = (message: StreamBusMessage) => void | Promise<void>;
+
 export type StreamBusConsumerConfig = {
   redisUrl: string;
   streamBase?: string;
@@ -93,6 +95,32 @@ export class RedisStreamBusConsumer {
       { COUNT: count, BLOCK: blockMs }
     );
     return this.normalizeReadReply(reply);
+  }
+
+  async processPendingAndNew(
+    type: StreamType,
+    handler: StreamBusMessageHandler,
+    options?: {
+      pendingCount?: number;
+      freshCount?: number;
+      blockMs?: number;
+      continueOnError?: boolean;
+    }
+  ): Promise<void> {
+    const pending = await this.readPending(type, options?.pendingCount);
+    const fresh = await this.readNew(type, options?.freshCount, options?.blockMs);
+    for (const batch of [...pending, ...fresh]) {
+      for (const message of batch.messages) {
+        try {
+          await handler(message);
+          await this.ack(type, message.id);
+        } catch (err) {
+          if (!options?.continueOnError) {
+            throw err;
+          }
+        }
+      }
+    }
   }
 
   async ack(type: StreamType, ids: string | string[]): Promise<number> {

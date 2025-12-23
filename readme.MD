@@ -294,18 +294,16 @@ const consumer = new RedisStreamBusConsumer({
 await consumer.connect();
 await consumer.ensureGroup("candle");
 
-const pending = await consumer.readPending("candle", 100);
-const fresh = await consumer.readNew("candle", 100, 2000);
-
-for (const batch of [...pending, ...fresh]) {
-  for (const msg of batch.messages) {
+await consumer.processPendingAndNew(
+  "candle",
+  async (msg) => {
     const event = decodeStreamEvent(msg.fields);
     if (event) {
       // handle event...
-      await consumer.ack("candle", msg.id);
     }
-  }
-}
+  },
+  { pendingCount: 100, freshCount: 100, blockMs: 2000, continueOnError: true }
+);
 ```
 
 Consumer 侧按 readme 约定：先处理 pending，再读取新消息（>），处理成功后必须 ack。

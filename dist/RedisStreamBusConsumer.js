@@ -8,11 +8,13 @@ class RedisStreamBusConsumer {
         this.streamBase = config.streamBase ?? "md_stream";
         this.groupName = config.groupName;
         this.consumerName = config.consumerName;
-    }
-    async connect() {
+        this.minIdleMs = config.minIdleMs ?? 60000;
+        this.claimCount = config.claimCount ?? 100;
         this.client.on("error", (err) => {
             console.error("redis error", err);
         });
+    }
+    async connect() {
         await this.client.connect();
     }
     async close() {
@@ -30,15 +32,32 @@ class RedisStreamBusConsumer {
             }
         }
     }
-    async readPending(type, count = 100) {
+    async readPending(type, count) {
         const key = this.streamKey(type);
-        const reply = await this.client.xReadGroup(this.groupName, this.consumerName, [{ key, id: "0" }], { COUNT: count });
-        return this.normalizeReadReply(reply);
+        const reply = await this.client.xAutoClaim(key, this.groupName, this.consumerName, this.minIdleMs, "0-0", { COUNT: count ?? this.claimCount });
+        return this.normalizeAutoClaimReply(key, reply);
     }
     async readNew(type, count = 100, blockMs) {
         const key = this.streamKey(type);
         const reply = await this.client.xReadGroup(this.groupName, this.consumerName, [{ key, id: ">" }], { COUNT: count, BLOCK: blockMs });
         return this.normalizeReadReply(reply);
+    }
+    async processPendingAndNew(type, handler, options) {
+        const pending = await this.readPending(type, options?.pendingCount);
+        const fresh = await this.readNew(type, options?.freshCount, options?.blockMs);
+        for (const batch of [...pending, ...fresh]) {
+            for (const message of batch.messages) {
+                try {
+                    await handler(message);
+                    await this.ack(type, message.id);
+                }
+                catch (err) {
+                    if (!options?.continueOnError) {
+                        throw err;
+                    }
+                }
+            }
+        }
     }
     async ack(type, ids) {
         const key = this.streamKey(type);
@@ -58,6 +77,19 @@ class RedisStreamBusConsumer {
             }))
         }));
     }
+    normalizeAutoClaimReply(key, reply) {
+        if (!reply?.messages?.length)
+            return [];
+        const messages = reply.messages
+            .filter((message) => message)
+            .map((message) => ({
+            id: String(message.id),
+            fields: this.toStringFields(message.message ?? {})
+        }));
+        if (!messages.length)
+            return [];
+        return [{ key, messages }];
+    }
     toStringFields(fields) {
         const out = {};
         for (const [key, value] of Object.entries(fields)) {
@@ -68,13 +100,18 @@ class RedisStreamBusConsumer {
 }
 exports.RedisStreamBusConsumer = RedisStreamBusConsumer;
 const decodeCandle = (fields) => {
+    if (fields.ver !== "1")
+        return null;
     if (fields.t !== "CANDLE")
         return null;
     const startTs = Number(fields.startTs);
     if (!Number.isFinite(startTs))
         return null;
-    const eventTs = fields.eventTs ? Number(fields.eventTs) : undefined;
+    const eventTs = Number(fields.eventTs);
+    if (!Number.isFinite(eventTs))
+        return null;
     return {
+        ver: "1",
         t: "CANDLE",
         coin: fields.coin ?? "",
         interval: fields.interval ?? "",
@@ -85,15 +122,20 @@ const decodeCandle = (fields) => {
         c: fields.c ?? "",
         v: fields.v ?? "",
         isClosed: fields.isClosed === "true",
-        eventTs: Number.isFinite(eventTs ?? NaN) ? eventTs : undefined
+        eventTs
     };
 };
 exports.decodeCandle = decodeCandle;
 const decodeBookTopN = (fields) => {
+    if (fields.ver !== "1")
+        return null;
     if (fields.t !== "BOOK_TOPN")
         return null;
     const depth = Number(fields.depth);
     if (!Number.isFinite(depth))
+        return null;
+    const eventTs = Number(fields.eventTs);
+    if (!Number.isFinite(eventTs))
         return null;
     let bids = [];
     let asks = [];
@@ -104,31 +146,38 @@ const decodeBookTopN = (fields) => {
     catch {
         return null;
     }
-    const eventTs = fields.eventTs ? Number(fields.eventTs) : undefined;
     return {
+        ver: "1",
         t: "BOOK_TOPN",
         coin: fields.coin ?? "",
         depth,
         bids,
         asks,
-        eventTs: Number.isFinite(eventTs ?? NaN) ? eventTs : undefined
+        eventTs
     };
 };
 exports.decodeBookTopN = decodeBookTopN;
 const decodeTrade = (fields) => {
+    if (fields.ver !== "1")
+        return null;
     if (fields.t !== "TRADE")
         return null;
     const ts = Number(fields.ts);
     if (!Number.isFinite(ts))
         return null;
+    const eventTs = Number(fields.eventTs);
+    if (!Number.isFinite(eventTs))
+        return null;
     const side = fields.side === "B" ? "B" : "S";
     return {
+        ver: "1",
         t: "TRADE",
         coin: fields.coin ?? "",
         ts,
         px: fields.px ?? "",
         sz: fields.sz ?? "",
-        side
+        side,
+        eventTs
     };
 };
 exports.decodeTrade = decodeTrade;
