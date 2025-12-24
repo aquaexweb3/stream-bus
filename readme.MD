@@ -14,7 +14,11 @@ A Redis Streams-based market data stream layer for publishing and consuming cand
 
 ## Install
 ```bash
-npm install @aquaexweb3/stream-bus
+# Install from GitHub (recommended)
+npm install github:aquaexweb3/stream-bus
+
+# Install a specific tag
+npm install github:aquaexweb3/stream-bus#v1.0.0
 ```
 
 ## Build
@@ -151,5 +155,13 @@ Override via `maxLenCandle`, `maxLenBook`, `maxLenTrade` on `RedisStreamBus`.
 - TypeScript is built with `strict: true`.
 - Run `npm run build` before publishing or consuming locally.
 
+## Releases (GitHub)
+- Create a tag for a stable version: `git tag v1.0.0`.
+- Push tags: `git push origin --tags`.
+- GitHub Actions will create a Release from the tag.
+
+## Versioning
+- Use semantic version tags: `vMAJOR.MINOR.PATCH` (e.g., `v1.2.0`).
+
 ## License
-This project is private; see internal repository policies for usage and distribution.
+No license is currently specified.

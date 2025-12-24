@@ -9,17 +9,12 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "prepare": "tsc -p tsconfig.json",
-    "changeset": "changeset",
-    "version": "changeset version",
-    "release": "changeset publish"
+    "prepare": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "redis": "^4.6.14"
   },
   "devDependencies": {
-    "@changesets/changelog-github": "^0.5.0",
-    "@changesets/cli": "^2.27.1",
     "@types/node": "^20.12.8",
     "typescript": "^5.4.5"
   }
