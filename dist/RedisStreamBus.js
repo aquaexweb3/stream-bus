@@ -45,7 +45,6 @@ class RedisStreamBus {
                     l: event.l,
                     c: event.c,
                     v: event.v,
-                    isClosed: String(event.isClosed),
                     eventTs: String(event.eventTs)
                 }
             };

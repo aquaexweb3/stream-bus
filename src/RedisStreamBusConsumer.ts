@@ -182,7 +182,6 @@ export const decodeCandle = (fields: Record<string, string>): CandleStreamEvent 
     l: fields.l ?? "",
     c: fields.c ?? "",
     v: fields.v ?? "",
-    isClosed: fields.isClosed === "true",
     eventTs
   };
 };

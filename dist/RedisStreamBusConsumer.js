@@ -121,7 +121,6 @@ const decodeCandle = (fields) => {
         l: fields.l ?? "",
         c: fields.c ?? "",
         v: fields.v ?? "",
-        isClosed: fields.isClosed === "true",
         eventTs
     };
 };

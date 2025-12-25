@@ -9,7 +9,6 @@ export type CandleStreamEvent = {
     l: string;
     c: string;
     v: string;
-    isClosed: boolean;
     eventTs: number;
 };
 export type BookTopNStreamEvent = {
